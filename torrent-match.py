@@ -59,7 +59,7 @@ def main():
         try:
             temp = subprocess.check_output(["lstor", "-q", "-V", "-o", "info.name", path]).decode("utf-8", "surrogateescape")[:-1]
             if not temp:
-                raise ValueError("No file/folder name specified")
+                raise ValueError("No file/folder info returned from 'lstor'")
         except (subprocess.CalledProcessError, UnicodeDecodeError, ValueError) as e:
             print ("Couldn't check '{}': {}".format(path, e)) 
             continue
