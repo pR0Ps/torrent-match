@@ -87,7 +87,6 @@ def main():
         if missing:
             print ("The following torrents don't have their matching files:")
             print_tors(missing)
-            print (missing)
 
 
 if __name__ == "__main__":
