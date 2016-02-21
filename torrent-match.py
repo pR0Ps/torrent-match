@@ -57,7 +57,7 @@ def main():
         path = os.path.join(os.getcwd(), sys.argv[1], x)
 
         try:
-            temp = subprocess.check_output(["lstor", "-q", "-V", "-o", "info.name", path]).decode("utf-8", "surrogateescape")[:-1]
+            temp = subprocess.check_output(["lstor", "--quiet", "--skip-validation", "-o", "info.name", path]).decode("utf-8", "surrogateescape")[:-1]
             if not temp:
                 raise ValueError("No file/folder info returned from 'lstor'")
         except (subprocess.CalledProcessError, UnicodeDecodeError, ValueError) as e:
