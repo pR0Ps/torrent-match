@@ -1,93 +1,102 @@
 #!/usr/bin/env python3
 
-import sys
 import os
 import subprocess
+import sys
 
-NAME = "torrent-match"
-VERSION = "0.1.0"
+
+def has_cmd(cmd):
+    try:
+        # command is a shell builtin, won't work without shell=True
+        subprocess.check_call("command -v '{}'".format(cmd), shell=True, stdout=subprocess.DEVNULL)
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+
+def print_tors(s):
+    for x in s:
+        print ("  {}".format(x.encode("utf-8").decode("utf-8", "replace")))
+
 
 def main():
-
-    # TODO: argparse
-    # TODO: quiet mode
-    # TODO: porcelain mode
-    num_args = len(sys.argv) - 1
-    if num_args:
-        if sys.argv[1] in ("-h", "--help"):
-            print ("Usage: {} [options] <torrent dir> <data dir>".format(NAME))
-            print ()
-            print ("{} {}".format(NAME, VERSION))
-            print ()
-            print ("Checks a directory of torrents against a data directory and points out any differences.")
-            print ("Examples:")
-            print (" - a file in the data folder with no matching torrent")
-            print (" - a torrent in the torrent folder with it's content downloaded to a different folder")
-            print (" - a torrent in the torrent folder that hasn't been downloaded")
-            print ()
-            print ("Options:")
-            print ("  --version        Print version information")
-            print ("  -h, --help       Print this help text")
-            print ()
-            print ("Requires the 'lstor' tool (part of the 'pyrocore' package)")
-            print ()
-            return
-        elif sys.argv[1] == "--version":
-            print ("{} {}".format(NAME, VERSION))
-            return
-
-    if num_args != 2:
-        print ("Invalid arguments (\"{} --help\" for help)".format(NAME))
+    if len(sys.argv) != 3:
+        print ("Checks a directory of torrents against a data directory and points out any differences")
+        print ("For example, a file in the data folder with no matching torrent or vice versa")
+        print ("  Usage: {} <torrent dir> <data dir>".format(os.path.basename(__file__)))
         return
 
-    # TODO: Use the python library instead of going to the system?
-    try:
-        if subprocess.call(["lstor", "--version"]) != 0:
-            raise EnvironmentError()
-    except EnvironmentError:
-        print ("Error: couldn't find the 'lstor' tool ('pyrocore' installed and in the path?)")
+    if not has_cmd("lstor"):
+        print("This script requires the 'lstor' command")
+        print("Install it from https://github.com/pyroscope/pyrocore") 
         return
+
+    # Normalize and strip trailing slashes
+    torrent_dir = os.path.normpath(sys.argv[1])
+    data_dir = os.path.normpath(sys.argv[2])
 
     print ("Getting file/folder names from torrents...")
-    data = {}
-    for x in os.listdir(sys.argv[1]):
+    tor_tor = set()
+    tor_data = set()
+    for x in os.listdir(torrent_dir):
         if not x.endswith(".torrent"):
             continue
 
-        path = os.path.join(os.getcwd(), sys.argv[1], x)
+        tor_tor.add(x)
+        path = os.path.join(os.getcwd(), torrent_dir, x)
 
         try:
-            temp = subprocess.check_output(["lstor", "--quiet", "--skip-validation", "-o", "info.name", path]).decode("utf-8", "surrogateescape")[:-1]
+            temp = subprocess.check_output(["lstor", "--skip-validation", "--quiet", "-o", "info.name", path], stderr=subprocess.DEVNULL).decode("utf-8", "surrogateescape")[:-1]
             if not temp:
-                raise ValueError("No file/folder info returned from 'lstor'")
-        except (subprocess.CalledProcessError, UnicodeDecodeError, ValueError) as e:
+                raise ValueError("No file/folder name specified")
+        except Exception as e:
             print ("Couldn't check '{}': {}".format(path, e)) 
-            continue
+        else:
+            tor_data.add(temp)
 
-        data[x] = temp
+    rt_tor = None
+    if has_cmd("rtcontrol"):
+        print ("Getting a list of file/folder names from rTorrent...")
+        try:
+            temp = subprocess.check_output(["rtcontrol", "--quiet", "directory={}*".format(data_dir), "-o", "metafile.pathbase"], stderr=subprocess.DEVNULL).decode("utf-8", "surrogateescape")[:-1]
+        except Exception as e:
+            print ("Couldn't get torrent listing from rTorrent: {}".format(e))
+        else:
+            rt_tor = set(temp.split('\n'))
 
-    print ("Checking files/folders against the torrent files...")
-    files = set(os.listdir(sys.argv[2]))
-    torrents = set(data.values())
+    print("Getting file list from data directory...")
+    data_data = set(os.listdir(data_dir))
 
-    extra = files - torrents
-    missing = torrents - files
+    print ("Analyzing collected data")
+    if rt_tor is not None:
+        missing_loaded = tor_tor - rt_tor
+        extra_loaded = rt_tor - tor_tor
 
-    def print_tors(s):
-        for x in s:
-            print ("  {}".format(x.encode("utf-8").decode("utf-8", "replace")))
+    extra_data = data_data - tor_data
+    missing_data = tor_data - data_data
 
     print ("Analysis complete")
-    if not missing and not extra:
+    print ("-----------------")
+    if rt_tor is not None:
+        if not missing_loaded and not extra_loaded:
+            print("Torrent files are in sync with rTorrent")
+        elif missing_loaded:
+            print ("The following torrents aren't loaded in rTorrent")
+            print_tors(missing_loaded)
+        elif extra_loaded:
+            print ("The following extra torrents are loaded in rtorrent")
+            print_tors(extra_loaded)
+
+    if not missing_data and not extra_data:
         print ("Files/folders are in sync with the torrent files")
-    else:
-        if extra:
-            print ("The following folders don't have a matched torrent:")
-            print_tors(extra)
-        if missing:
-            print ("The following torrents don't have their matching files:")
-            print_tors(missing)
+    elif extra_data:
+        print ("The following folders don't have a matched torrent:")
+        print_tors(extra_data)
+    elif missing_data:
+        print ("The following torrents don't have their matching files (were they renamed?):")
+        print_tors(missing_data)
 
 
 if __name__ == "__main__":
     main()
+
