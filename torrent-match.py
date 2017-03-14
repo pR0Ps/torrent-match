@@ -2,41 +2,50 @@
 
 import os
 import subprocess
+import shutil
 import sys
 
-
-def has_cmd(cmd):
-    try:
-        # command is a shell builtin, won't work without shell=True
-        subprocess.check_call("command -v '{}'".format(cmd), shell=True, stdout=subprocess.DEVNULL)
-        return True
-    except subprocess.CalledProcessError:
-        return False
-
+from bencodepy import decode_from_file, DecodingError
 
 def print_tors(s):
     for x in s:
-        print ("  {}".format(x.encode("utf-8").decode("utf-8", "replace")))
+        print ("  {}".format(x))
 
 def collect_torrents(torrent_dir):
+    print ("Getting file/folder names from torrents...")
     tor_tor = set()
     tor_data = set()
-    for x in os.listdir(torrent_dir):
-        if not x.endswith(".torrent"):
+    for x in os.scandir(torrent_dir):
+        if not x.is_file() or not x.name.endswith(".torrent"):
             continue
 
-        tor_tor.add(x)
-        path = os.path.join(os.getcwd(), torrent_dir, x)
+        tor_tor.add(x.name)
+        path = os.path.join(os.getcwd(), torrent_dir, x.name)
 
+        data = decode_from_file(path)
         try:
-            temp = subprocess.check_output(["lstor", "--skip-validation", "--quiet", "-o", "info.name", path], stderr=subprocess.DEVNULL).decode("utf-8", "surrogateescape")[:-1]
-            if not temp:
-                raise ValueError("No file/folder name specified")
-        except Exception as e:
+            tor_data.add(data[b"info"][b"name"].decode("utf-8"))
+        except (OSError, DecodingError, KeyError) as e:
             print ("Couldn't check '{}': {}".format(path, e))
-        else:
-            tor_data.add(temp)
+
     return tor_tor, tor_data
+
+def collect_rtorrent():
+    if not shutil.which("rtcontrol"):
+        return None
+
+    print ("Getting a list of file/folder names from rTorrent...")
+    try:
+        temp = subprocess.check_output(["rtcontrol", "--quiet", "directory={}*".format(data_dir), "-o", "metafile.pathbase"], stderr=subprocess.DEVNULL).decode("utf-8", "surrogateescape")[:-1]
+    except Exception as e:
+        print ("Couldn't get torrent listing from rTorrent: {}".format(e))
+    else:
+        return set(temp.split('\n'))
+
+def collect_data_dir(data_dir):
+    print("Getting file list from data directory...")
+    return set(x.name for x in os.scandir(data_dir))
+
 
 def main():
     if len(sys.argv) != 3:
@@ -45,30 +54,13 @@ def main():
         print ("  Usage: {} <torrent dir> <data dir>".format(os.path.basename(__file__)))
         return
 
-    if not has_cmd("lstor"):
-        print("This script requires the 'lstor' command")
-        print("Install it from https://github.com/pyroscope/pyrocore") 
-        return
-
     # Normalize and strip trailing slashes
     torrent_dir = os.path.normpath(sys.argv[1])
     data_dir = os.path.normpath(sys.argv[2])
 
-    print ("Getting file/folder names from torrents...")
     tor_tor, tor_data = collect_torrents(torrent_dir)
-
-    rt_tor = None
-    if has_cmd("rtcontrol"):
-        print ("Getting a list of file/folder names from rTorrent...")
-        try:
-            temp = subprocess.check_output(["rtcontrol", "--quiet", "directory={}*".format(data_dir), "-o", "metafile.pathbase"], stderr=subprocess.DEVNULL).decode("utf-8", "surrogateescape")[:-1]
-        except Exception as e:
-            print ("Couldn't get torrent listing from rTorrent: {}".format(e))
-        else:
-            rt_tor = set(temp.split('\n'))
-
-    print("Getting file list from data directory...")
-    data_data = set(os.listdir(data_dir))
+    rt_tor = collect_rtorrent()
+    data_data = collect_data_dir(data_dir)
 
     print ("Analyzing collected data")
     if rt_tor is not None:
