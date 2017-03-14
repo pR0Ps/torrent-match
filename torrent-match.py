@@ -18,6 +18,25 @@ def print_tors(s):
     for x in s:
         print ("  {}".format(x.encode("utf-8").decode("utf-8", "replace")))
 
+def collect_torrents(torrent_dir):
+    tor_tor = set()
+    tor_data = set()
+    for x in os.listdir(torrent_dir):
+        if not x.endswith(".torrent"):
+            continue
+
+        tor_tor.add(x)
+        path = os.path.join(os.getcwd(), torrent_dir, x)
+
+        try:
+            temp = subprocess.check_output(["lstor", "--skip-validation", "--quiet", "-o", "info.name", path], stderr=subprocess.DEVNULL).decode("utf-8", "surrogateescape")[:-1]
+            if not temp:
+                raise ValueError("No file/folder name specified")
+        except Exception as e:
+            print ("Couldn't check '{}': {}".format(path, e))
+        else:
+            tor_data.add(temp)
+    return tor_tor, tor_data
 
 def main():
     if len(sys.argv) != 3:
@@ -36,23 +55,7 @@ def main():
     data_dir = os.path.normpath(sys.argv[2])
 
     print ("Getting file/folder names from torrents...")
-    tor_tor = set()
-    tor_data = set()
-    for x in os.listdir(torrent_dir):
-        if not x.endswith(".torrent"):
-            continue
-
-        tor_tor.add(x)
-        path = os.path.join(os.getcwd(), torrent_dir, x)
-
-        try:
-            temp = subprocess.check_output(["lstor", "--skip-validation", "--quiet", "-o", "info.name", path], stderr=subprocess.DEVNULL).decode("utf-8", "surrogateescape")[:-1]
-            if not temp:
-                raise ValueError("No file/folder name specified")
-        except Exception as e:
-            print ("Couldn't check '{}': {}".format(path, e)) 
-        else:
-            tor_data.add(temp)
+    tor_tor, tor_data = collect_torrents(torrent_dir)
 
     rt_tor = None
     if has_cmd("rtcontrol"):
