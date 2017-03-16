@@ -12,7 +12,7 @@ from bencodepy import decode_from_file, DecodingError
 def run_command(*args, **kwargs):
     p = subprocess.Popen(*args, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                          **kwargs)
-    out, err = (x.decode("utf-8").strip() for x in p.communicate())
+    out, err = (x.decode("utf-8", errors="replace").strip() for x in p.communicate())
     return p.returncode, out, err
 
 
@@ -33,7 +33,7 @@ def collect_torrents(torrent_dirs):
             try:
                 path = os.path.abspath(os.path.join(os.getcwd(), x.path))
                 data = decode_from_file(path)
-                name = data[b"info"][b"name"].decode("utf-8")
+                name = data[b"info"][b"name"].decode("utf-8", errors="replace")
             except (OSError, DecodingError, KeyError) as e:
                 print("Couldn't check '{}': {}".format(path, e))
             else:
