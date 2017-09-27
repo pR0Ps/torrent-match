@@ -121,8 +121,17 @@ def main():
                 print("The following extra torrents downloading into the data directory are loaded in rTorrent:")
                 print_torrents(extra_loaded)
 
-    extra_data = data_dir - torrent_data
     missing_data = torrent_data - data_dir
+    all_extra = data_dir - torrent_data
+    extra_symlinks = set(x for x in all_extra if os.path.islink(os.path.join(config.data_dir, x)))
+    extra_data = all_extra - extra_symlinks
+
+    # Special case for all symlinks
+    # - Extra symlinks to data outside the data directory are invalid
+    # - Extra symlinks to data inside the data directory are valid
+    symlink_data = {x: os.path.relpath(os.path.realpath(os.path.join(config.data_dir, x))) for x in extra_symlinks}
+    invalid_symlinks = list("{} -> {}".format(name, path) for name, path in symlink_data.items() if os.path.dirname(path))
+
 
     if not missing_data and not extra_data:
         print("Data files/folders are in sync with the torrent files")
@@ -134,6 +143,9 @@ def main():
         if missing_data:
             print("The following torrents don't have their matching files (were they renamed?):")
             print_torrents(missing_data)
+        if invalid_symlinks:
+            print("The following symlinks to external content don't have a matching torrent:")
+            print_torrents(invalid_symlinks)
 
     return ret_code
 
