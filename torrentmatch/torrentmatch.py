@@ -49,7 +49,7 @@ def collect_rtorrent(data_dir):
         return None
 
     # Remove trailing slash if it exists
-    data_dir = os.path.normpath(data_dir)
+    data_dir = os.path.normpath(os.path.abspath(data_dir))
 
     # directory is different if the torrent data is a single file or a folder
     dir_filter_files="directory={}".format(data_dir)
