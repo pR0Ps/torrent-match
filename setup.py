@@ -3,7 +3,7 @@
 from setuptools import setup
 
 setup(name="torrent-match",
-      version="0.0.1",
+      version="0.0.2",
       description="Match torrent files against a download directory",
       url="https://github.com/pR0Ps/torrent-match",
       license="MIT",
@@ -15,7 +15,7 @@ setup(name="torrent-match",
           "Programming Language :: Python :: 3.5",
           "Programming Language :: Python :: 3.6",
       ],
-      packages=["torrentmatch"],
+      py_modules=["torrentmatch"],
       install_requires=["bencodepy >= 0.9.5"],
-      entry_points={'console_scripts': ["torrent-match=torrentmatch.torrentmatch:main"]}
+      entry_points={'console_scripts': ["torrent-match=torrentmatch:main"]}
 )
